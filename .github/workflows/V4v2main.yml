@@ -1,0 +1,37 @@
+name: Kernel Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential bc bison flex libssl-dev \
+          libncurses5-dev git wget curl device-tree-compiler
+
+      - name: Build kernel
+        run: |
+          mkdir -p out
+          make O=out ARCH=arm64 defconfig
+          make -j$(nproc) O=out ARCH=arm64
+
+      - name: Upload kernel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-output
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/zImage*
+            out/arch/arm64/boot/dts/**/*.dtb
