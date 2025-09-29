@@ -1,0 +1,56 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout kernel source
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          git wget build-essential bc bison flex libssl-dev \
+          gcc clang lld make libncurses5-dev libncursesw5-dev python3 \
+          gcc-aarch64-linux-gnu
+
+    - name: Setup Clang
+      run: |
+        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        tar -xf clang+llvm-14.0.6-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        echo "PATH=$PWD/clang+llvm-14.0.6-x86_64-linux-gnu-ubuntu-20.04/bin:$PATH" >> $GITHUB_ENV
+
+    - name: Build kernel
+      run: |
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export CC=clang
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        mkdir -p out
+        echo "⚙️ Running defconfig..."
+        if [ -f arch/arm64/configs/vendor/marble_defconfig ]; then
+          make O=out vendor/marble_defconfig
+        else
+          echo "❌ Defconfig vendor/marble_defconfig not found!"
+          echo "Available defconfigs:"
+          ls arch/arm64/configs/ | grep defconfig
+          exit 1
+        fi
+        echo "⚙️ Building kernel..."
+        make -j$(nproc) O=out CC=clang 2>&1 | tee out/build.log
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel-build
+        path: |
+          out/arch/arm64/boot/Image.gz-dtb
+          out/arch/arm64/boot/Image.gz
+          out/arch/arm64/boot/Image
+          out/build.log
+        if-no-files-found: warn
