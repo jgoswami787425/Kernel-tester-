@@ -1,0 +1,64 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:  # Manual trigger
+  # push:               # Optional: uncomment if you want push trigger
+  #   branches:
+  #     - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1️⃣ Checkout kernel source
+    - name: Checkout kernel source
+      uses: actions/checkout@v4
+
+    # 2️⃣ Install dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          git wget build-essential bc bison flex libssl-dev \
+          gcc clang lld make libncurses5-dev libncursesw5-dev python3 \
+          gcc-aarch64-linux-gnu
+
+    # 3️⃣ Setup Clang
+    - name: Setup Clang
+      run: |
+        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        tar -xf clang+llvm-14.0.6-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        echo "PATH=$PWD/clang+llvm-14.0.6-x86_64-linux-gnu-ubuntu-20.04/bin:$PATH" >> $GITHUB_ENV
+
+    # 4️⃣ Build kernel
+    - name: Build kernel
+      run: |
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export CC=clang
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        mkdir -p out
+        echo "⚙️ Checking defconfig..."
+        if [ -f arch/arm64/configs/vendor/marble_defconfig ]; then
+          make O=out vendor/marble_defconfig
+        else
+          echo "❌ Defconfig vendor/marble_defconfig not found!"
+          echo "Available defconfigs:"
+          ls arch/arm64/configs/ | grep defconfig
+          exit 1
+        fi
+        echo "⚙️ Building kernel..."
+        make -j$(nproc) O=out CC=clang 2>&1 | tee out/build.log
+
+    # 5️⃣ Upload artifacts using v4
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-build
+        path: |
+          out/arch/arm64/boot/Image.gz-dtb
+          out/arch/arm64/boot/Image.gz
+          out/arch/arm64/boot/Image
+          out/build.log
+        if-no-files-found: warn
