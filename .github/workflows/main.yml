@@ -1,0 +1,47 @@
+name: Kernel-Module-Build
+
+on:
+  workflow_dispatch:   # Manual run button activate thase
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y bc bison flex libssl-dev make \
+              gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+              python3
+
+      - name: Setup environment
+        run: |
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export SUBARCH=arm64
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+
+      - name: Build Kernel
+        run: |
+          make O=out lineage_defconfig
+          make O=out -j$(nproc)
+
+      - name: Build External Module (example)
+        run: |
+          make M=drivers/net/wireless O=out -j$(nproc)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernel-output
+          path: |
+            out/arch/arm64/boot/*
+            drivers/net/wireless/*.ko
