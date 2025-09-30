@@ -1,0 +1,28 @@
+name: Kernel Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        run: sudo apt-get update && sudo apt-get install -y build-essential bc bison flex libssl-dev
+
+      - name: Build Kernel
+        run: |
+          make O=out ARCH=arm64 vendor/oneplus12r_defconfig
+          make O=out ARCH=arm64 -j$(nproc)
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel
+          path: out/arch/arm64/boot/Image
