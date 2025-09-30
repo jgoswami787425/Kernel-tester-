@@ -1,0 +1,3 @@
+out/arch/arm64/boot/Image
+out/arch/arm64/boot/dtbo.img
+out/arch/arm64/boot/vendor_boot.img
